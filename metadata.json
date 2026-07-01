@@ -1,0 +1,6 @@
+{
+  "name": "سامانه ارزیابی بیان هدهد",
+  "description": "پلتفرم جامع مدیریت و ارزیابی چندمرحله‌ای فن بیان، هوش و سخنوری موسسه هدهد با تحلیل‌های هوش مصنوعی Gemini",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

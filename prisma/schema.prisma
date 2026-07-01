@@ -1,0 +1,136 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ApplicantStatus {
+  PENDING_CONTACT
+  SCHEDULED
+  ARRIVED
+  IN_CONSULTATION
+  IN_MIDDLE_ROOM
+  IN_TEST
+  IN_RESULT
+  COMPLETED
+  NO_SHOW
+}
+
+enum CaseStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum StageName {
+  CONTACT
+  RECEPTION
+  CONSULTATION
+  MIDDLE_ROOM
+  TEST
+  RESULT
+}
+
+model Applicant {
+  id             String          @id @default(uuid())
+  fullName       String
+  nationalId     String          @unique
+  phone          String
+  age            Int
+  gender         Gender
+  educationLevel String
+  occupation     String
+  city           String
+  status         ApplicantStatus @default(PENDING_CONTACT)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?       // برای پشتیبانی از حذف نرم (Soft Delete)
+
+  // روابط (Relationships)
+  caseRecords    CaseRecord[]
+
+  @@index([nationalId])
+  @@index([status])
+}
+
+model CaseRecord {
+  id           String       @id @default(uuid())
+  dossierCode  String       @unique // کد پرونده اختصاصی، مثال: HOD-2026-0001
+  status       CaseStatus   @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  closedAt     DateTime?
+
+  // روابط (Relationships)
+  applicantId  String
+  applicant    Applicant    @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  stageRecords StageRecord[]
+
+  @@index([applicantId])
+  @@index([status])
+}
+
+model StageRecord {
+  id             String        @id @default(uuid())
+  stageName      StageName
+  enteredAt      DateTime      @default(now())
+  exitedAt       DateTime?
+  isCompleted    Boolean       @default(false)
+  sequenceOrder  Int           // اولویت و ترتیب مراحل از ۱ تا ۶
+
+  // روابط (Relationships)
+  caseRecordId   String
+  caseRecord     CaseRecord    @relation(fields: [caseRecordId], references: [id], onDelete: Cascade)
+  operatorNotes  OperatorNote[]
+
+  @@index([caseRecordId])
+  @@index([stageName])
+}
+
+model OperatorNote {
+  id             String        @id @default(uuid())
+  operatorId     String        // شناسه اپراتور انسانی ثبت‌کننده یادداشت عمومی
+  operatorName   String        // نام اپراتور برای دسترسی سریع بدون Join سنگین
+  noteContent    String        @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // روابط (Relationships)
+  stageRecordId  String
+  stageRecord    StageRecord   @relation(fields: [stageRecordId], references: [id], onDelete: Cascade)
+  aiAnalyses     AIAnalysis[]  // رابطه ۱:N دقیق با تحلیلهای حاصل از مدل Gemini
+
+  @@index([stageRecordId])
+  @@index([operatorId])
+}
+
+model AIAnalysis {
+  id             String        @id @default(uuid())
+  modelName      String        @default("gemini-3.5-flash") // نام مدل استفاده شده در تحلیل
+  analysisType   String        // نوع تحلیل، مانند: رفتار، فن بیان، شخصیت، یا خلاصه‌سازی
+  rawPayload     Json          // ذخیره‌سازی داده‌های خروجی ساختاریافته مدل به صورت مستندات کامل JSON
+  categoryScore  Float?        // امتیاز تحلیل و سنجش کیفی محاسبه شده توسط مدل (مثلاً بین ۰ تا ۱۰۰)
+  tags           String[]      // تگ‌های دسته‌بندی استخراج شده توسط هوش مصنوعی
+  isFlagged      Boolean       @default(false) // نشان‌گذاری در صورت تشخیص موارد حساس یا بحرانی
+  flagReason     String?       @db.Text
+  createdAt      DateTime      @default(now())
+
+  // روابط (Relationships)
+  operatorNoteId String
+  operatorNote   OperatorNote  @relation(fields: [operatorNoteId], references: [id], onDelete: Cascade)
+
+  @@index([operatorNoteId])
+  @@index([modelName])
+}
